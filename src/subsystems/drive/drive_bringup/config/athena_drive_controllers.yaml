@@ -46,9 +46,9 @@ ackermann_steering_controller:
   # unsure why but ackermann controller only goes about half of scale_linear.x in teleop_twist
   # ackermann controller turns to at max scale_angular.yaw*pi. Seems to ignore how much you input, relies more on how fast rover is going
   ros__parameters:
-    rear_wheels_names: ["wheel_back_left_joint", "wheel_back_right_joint"] # This is traction control "wheel_back_left_joint", "wheel_back_right_joint", 
-    front_wheels_names: ["swerve_module_front_left_joint", "swerve_module_front_right_joint"] # This is steering, don't ask why its just called front wheels
-    # front_steering_names: ["swerve_module_front_left_joint", "swerve_module_front_right_joint"]
+    rear_wheels_names: ["propulsion_bl_joint", "propulsion_br_joint"] # This is traction control "propulsion_bl_joint", "propulsion_br_joint", 
+    front_wheels_names: ["steer_fl_joint", "steer_fr_joint"] # This is steering, don't ask why its just called front wheels
+    # front_steering_names: ["steer_fl_joint", "steer_fr_joint"]
     front_wheel_track: 0.6604
     rear_wheel_track: 0.6604
     wheelbase: 0.8382
@@ -59,13 +59,13 @@ ackermann_steering_controller:
 single_ackermann_controller:
   ros__parameters:
     drive_joints:
-      - "wheel_front_left_joint"
-      - "wheel_front_right_joint"
-      - "wheel_back_left_joint"
-      - "wheel_back_right_joint"
+      - "propulsion_fl_joint"
+      - "propulsion_fr_joint"
+      - "propulsion_bl_joint"
+      - "propulsion_br_joint"
     steer_joints:
-      - "swerve_module_front_left_joint"
-      - "swerve_module_front_right_joint"
+      - "steer_fl_joint"
+      - "steer_fr_joint"
     wheelbase: 0.8382
     track_width: 0.6604
     wheel_radius: 0.254
@@ -73,35 +73,21 @@ single_ackermann_controller:
 drive_velocity_controller:
   ros__parameters:
     joints:
-      - wheel_front_left_joint
-      - wheel_front_right_joint
-      - wheel_back_left_joint
-      - wheel_back_right_joint
-      - swerve_module_front_left_joint
-      - swerve_module_front_right_joint
+      - propulsion_fl_joint
+      - propulsion_fr_joint
+      - propulsion_bl_joint
+      - propulsion_br_joint
+      - steer_fl_joint
+      - steer_fr_joint
     interface_name: velocity
 
 drive_position_controller:
   ros__parameters:
     joints:
-      - wheel_front_left_joint
-      - wheel_front_right_joint
-      - wheel_back_left_joint
-      - wheel_back_right_joint
-      - swerve_module_front_left_joint
-      - swerve_module_front_right_joint
+      - propulsion_fl_joint
+      - propulsion_fr_joint
+      - propulsion_bl_joint
+      - propulsion_br_joint
+      - steer_fl_joint
+      - steer_fr_joint
     interface_name: position
-
-# swerve_drive_controller:
-#   ros__parameters:
-#     front_left_drive_joint: wheel_front_left_joint
-#     front_right_drive_joint: wheel_front_right_joint
-#     rear_left_drive_joint: wheel_back_left_joint
-#     rear_right_drive_joint: wheel_back_right_joint
-#     front_left_swerve_joint: swerve_module_front_left_joint
-#     front_right_swerve_joint: swerve_module_front_right_joint
-#     rear_left_swerve_joint: swerve_module_front_left_joint   # PLEASE FIX
-#     rear_right_swerve_joint: swerve_module_front_right_joint # PLEASE FIX
-#     track_width: 1.0
-#     wheelbase: 1.0
-#     wheel_radius: 1.0

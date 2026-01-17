@@ -9,7 +9,7 @@
         <param name="can">can0</param>
       </hardware>
 
-      <joint name="swerve_module_front_left_joint">
+      <joint name="steer_fl_joint">
         <param name="node_id">6</param>
         <param name="gear_ratio">1</param>
         <command_interface name="position"/>
@@ -20,7 +20,7 @@
         <state_interface name="velocity"/>
       </joint>
 
-      <joint name="swerve_module_front_right_joint">
+      <joint name="steer_fr_joint">
         <param name="node_id">5</param>
         <param name="gear_ratio">1</param>
         <command_interface name="position"/>

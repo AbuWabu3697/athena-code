@@ -48,3 +48,34 @@ Once you're set up, here's how to contribute your changes:
 6. **Open a Pull Request** - Submit your changes for review: [Creating a pull request from a fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)
 
 Your PR will be reviewed by your lead, and once approved, it will be merged into the main codebase!
+
+### Workspace Startup:
+
+1. **Navigate to your workspace**
+
+2. **Install required dependencies**
+```bash
+rosdep install --from-paths src y --ignore-src
+```
+
+3. **Build the workspace**
+```bash
+colcon build --symlink-install
+```
+
+4. **Set up can0**
+
+_Hardware:_
+```bash
+./src/athena-code/src/tools/scripts/can_setup.sh 
+```
+
+_Virtual:_
+```bash
+./src/athena-code/src/tools/scripts/virtual_can_setup.sh
+```
+
+5. **Launch a subsystem!**
+```bash
+./src/athena-code/src/tools/scripts/<subsystem>_launch.sh
+```

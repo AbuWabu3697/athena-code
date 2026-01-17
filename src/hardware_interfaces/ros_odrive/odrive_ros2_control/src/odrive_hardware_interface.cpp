@@ -290,7 +290,7 @@ return_type ODriveHardwareInterface::write(const rclcpp::Time&, const rclcpp::Du
             Set_Input_Vel_msg_t msg;
             msg.Input_Vel = (axis.vel_setpoint_ * axis.gear_ratio_) / (2 * M_PI);
             msg.Input_Torque_FF = axis.torque_input_enabled_ ? (axis.torque_setpoint_ / axis.gear_ratio_): 0.0f;
-            //RCLCPP_INFO(rclcpp::get_logger("ODriveHardwareInterface"), "Writing velocities for ODrive %d Joint velocity of motor (rev/s): %f", axis.node_id_, (axis.vel_setpoint_ * axis.gear_ratio_) / (2 * M_PI));
+            // RCLCPP_INFO(rclcpp::get_logger("ODriveHardwareInterface"), "Writing velocities for ODrive %d Joint velocity of motor (rev/s): %f", axis.node_id_, (axis.vel_setpoint_ * axis.gear_ratio_) / (2 * M_PI));
 
             axis.send(msg);
         } else if (axis.torque_input_enabled_) {

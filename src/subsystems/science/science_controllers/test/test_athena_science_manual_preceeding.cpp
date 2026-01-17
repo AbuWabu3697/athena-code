@@ -23,7 +23,7 @@ using science_controllers::CMD_MY_ITFS;
 using science_controllers::control_mode_type;
 using science_controllers::STATE_MY_ITFS;
 
-class AthenaScienceManualTest : public AthenaScienceManualFixture<TestableAthenaScienceManual>
+class ScienceManualTest : public ScienceManualFixture<TestableScienceManual>
 {
 };
 

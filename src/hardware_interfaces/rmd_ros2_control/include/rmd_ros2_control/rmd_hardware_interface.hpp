@@ -38,7 +38,9 @@
 #include <rclcpp/node.hpp>
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/subscription.hpp>
-#include "msgs/msg/cana.hpp"
+
+#include "umdloop_can_library/SocketCanBus.hpp"
+#include "umdloop_can_library/CanFrame.hpp"
 
 namespace rmd_ros2_control
 {
@@ -84,6 +86,8 @@ public:
   hardware_interface::return_type write(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
+  void onCanMessage(const CANLib::CanFrame& frame);
+
   // Helper Functions
   double calculate_joint_position_from_motor_position(double motor_position, int gear_ratio);
   double calculate_joint_velocity_from_motor_velocity(double motor_velocity, int gear_ratio);
@@ -94,10 +98,10 @@ public:
 private:
 
   int num_joints;
+  int current_joint;
 
-
-  // EXPERIMENTING
-  std::vector<double> initial_position_;
+  // Mutex
+  std::mutex state_mutex_;
 
   // Store the state for the simulated robot
   std::vector<double> joint_state_position_;
@@ -107,26 +111,18 @@ private:
   std::vector<double> joint_command_position_;
   std::vector<double> joint_command_velocity_;
 
-  double encoder_position;
-  double motor_velocity;
-  double motor_position;
+  std::vector<double> encoder_position;
+  std::vector<double> motor_velocity;
+  std::vector<double> motor_position;
 
-  std::vector<bool> joint_initialization_;
-
-  rclcpp::Publisher<msgs::msg::CANA>::SharedPtr rmd_can_publisher_;
-  rclcpp::Subscription<msgs::msg::CANA>::SharedPtr rmd_can_subscriber_;
-  rclcpp::Node::SharedPtr node_;
-  uint16_t current_iteration;
-
-
-  msgs::msg::CANA received_joint_data_;
+  CANLib::SocketCanBus canBus;
+  CANLib::CanFrame can_tx_frame_;
+  CANLib::CanFrame can_rx_frame_;
 
   std::vector<int> joint_node_write_ids;
   std::vector<int> joint_node_read_ids;
   std::vector<int> joint_gear_ratios;
   std::vector<int> joint_orientation;
-
-
 
   enum integration_level_t : std::uint8_t
   {
@@ -143,4 +139,3 @@ private:
 }  // namespace rmd_hardware_interface
 
 #endif  // RMD_HARDWARE_INTERACE_HPP_
-

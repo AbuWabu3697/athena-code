@@ -11,8 +11,8 @@
 // [RosTeamWorkspace](https://github.com/StoglRobotics/ros_team_workspace) repository.
 //
 
-#ifndef TEMPLATES__ROS2_CONTROL__CONTROLLER__TEST_ATHENA_SCIENCE_MANUAL_HPP_
-#define TEMPLATES__ROS2_CONTROL__CONTROLLER__TEST_ATHENA_SCIENCE_MANUAL_HPP_
+#ifndef TEMPLATES__ROS2_CONTROL__CONTROLLER__TEST_SCIENCE_MANUAL_HPP_
+#define TEMPLATES__ROS2_CONTROL__CONTROLLER__TEST_SCIENCE_MANUAL_HPP_
 
 #include <chrono>
 #include <limits>
@@ -22,7 +22,7 @@
 #include <utility>
 #include <vector>
 
-#include "science_controllers/athena_science_manual.hpp"
+#include "science_controllers/science_manual.hpp"
 #include "gmock/gmock.h"
 #include "hardware_interface/loaned_command_interface.hpp"
 #include "hardware_interface/loaned_state_interface.hpp"
@@ -34,9 +34,9 @@
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 
 // TODO(anyone): replace the state and command message types
-using ControllerStateMsg = science_controllers::AthenaScienceManual::ControllerStateMsg;
-using ControllerReferenceMsg = science_controllers::AthenaScienceManual::ControllerReferenceMsg;
-using ControllerModeSrvType = science_controllers::AthenaScienceManual::ControllerModeSrvType;
+using ControllerStateMsg = science_controllers::ScienceManual::ControllerStateMsg;
+using ControllerReferenceMsg = science_controllers::ScienceManual::ControllerReferenceMsg;
+using ControllerModeSrvType = science_controllers::ScienceManual::ControllerModeSrvType;
 
 namespace
 {
@@ -45,20 +45,20 @@ constexpr auto NODE_ERROR = controller_interface::CallbackReturn::ERROR;
 }  // namespace
 
 // subclassing and friending so we can access member variables
-class TestableAthenaScienceManual : public science_controllers::AthenaScienceManual
+class TestableScienceManual : public science_controllers::ScienceManual
 {
-  FRIEND_TEST(AthenaScienceManualTest, all_parameters_set_configure_success);
-  FRIEND_TEST(AthenaScienceManualTest, activate_success);
-  FRIEND_TEST(AthenaScienceManualTest, reactivate_success);
-  FRIEND_TEST(AthenaScienceManualTest, test_setting_slow_mode_service);
-  FRIEND_TEST(AthenaScienceManualTest, test_update_logic_fast);
-  FRIEND_TEST(AthenaScienceManualTest, test_update_logic_slow);
+  FRIEND_TEST(ScienceManualTest, all_parameters_set_configure_success);
+  FRIEND_TEST(ScienceManualTest, activate_success);
+  FRIEND_TEST(ScienceManualTest, reactivate_success);
+  FRIEND_TEST(ScienceManualTest, test_setting_slow_mode_service);
+  FRIEND_TEST(ScienceManualTest, test_update_logic_fast);
+  FRIEND_TEST(ScienceManualTest, test_update_logic_slow);
 
 public:
   controller_interface::CallbackReturn on_configure(
     const rclcpp_lifecycle::State & previous_state) override
   {
-    auto ret = science_controllers::AthenaScienceManual::on_configure(previous_state);
+    auto ret = science_controllers::ScienceManual::on_configure(previous_state);
     // Only if on_configure is successful create subscription
     if (ret == CallbackReturn::SUCCESS)
     {
@@ -101,7 +101,7 @@ private:
 
 // We are using template class here for easier reuse of Fixture in specializations of controllers
 template <typename CtrlType>
-class AthenaScienceManualFixture : public ::testing::Test
+class ScienceManualFixture : public ::testing::Test
 {
 public:
   static void SetUpTestCase() {}
@@ -125,7 +125,7 @@ public:
   void TearDown() { controller_.reset(nullptr); }
 
 protected:
-  void SetUpController(const std::string controller_name = "test_athena_science_manual")
+  void SetUpController(const std::string controller_name = "test_science_manual")
   {
     ASSERT_EQ(
       controller_->init(controller_name, "", 0, "", controller_->define_custom_node_options()),
@@ -164,7 +164,7 @@ protected:
     rclcpp::Node test_subscription_node("test_subscription_node");
     auto subs_callback = [&](const ControllerStateMsg::SharedPtr) {};
     auto subscription = test_subscription_node.create_subscription<ControllerStateMsg>(
-      "/test_athena_science_manual/state", 10, subs_callback);
+      "/test_science_manual/state", 10, subs_callback);
 
     // call update to publish the test value
     ASSERT_EQ(
@@ -258,11 +258,11 @@ protected:
   std::vector<hardware_interface::CommandInterface> command_itfs_;
 
   // Test related parameters
-  std::unique_ptr<TestableAthenaScienceManual> controller_;
+  std::unique_ptr<TestableScienceManual> controller_;
   rclcpp::Node::SharedPtr command_publisher_node_;
   rclcpp::Publisher<ControllerReferenceMsg>::SharedPtr command_publisher_;
   rclcpp::Node::SharedPtr service_caller_node_;
   rclcpp::Client<ControllerModeSrvType>::SharedPtr slow_control_service_client_;
 };
 
-#endif  // TEMPLATES__ROS2_CONTROL__CONTROLLER__TEST_ATHENA_SCIENCE_MANUAL_HPP_
+#endif  // TEMPLATES__ROS2_CONTROL__CONTROLLER__TEST_SCIENCE_MANUAL_HPP_

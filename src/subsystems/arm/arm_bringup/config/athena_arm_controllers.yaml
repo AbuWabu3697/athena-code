@@ -106,7 +106,7 @@ manual_arm_joint_by_joint_controller:
       - elbow_pitch
       - wrist_pitch
       - wrist_roll
-      - gripper_claw
+      # - gripper_claw
     interface_name: velocity
     joint_max_velocities:
       - 62.83185307 # 10 rot/s, please change dawg
@@ -114,4 +114,4 @@ manual_arm_joint_by_joint_controller:
       - 0.05148721
       - 0.785398    # 45 dps
       - 0.785398
-      - 0.005       # TODO: Find this
+      # - 0.005       # TODO: Find this

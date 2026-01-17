@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="athena_science">
+
+  <xacro:arg name="use_mock_hardware" default="false"/>
+  <xacro:arg name="mock_sensor_commands" default="false"/>
+
+  <xacro:include filename="$(find description)/ros2_control/science/science.mock.ros2_control.xacro"/>
+
+  <xacro:include filename="$(find description)/ros2_control/science/science.stepper.ros2_control.xacro" />
+  <xacro:include filename="$(find description)/ros2_control/science/science.servo.ros2_control.xacro" />
+  <xacro:include filename="$(find description)/ros2_control/science/science.talon.ros2_control.xacro"/>
+  
+  <!-- create link fixed to the "world" -->
+  <link name="world"/>
+
+  <!-- === CONDITIONAL HARDWARE SETUP === -->
+
+  <!-- Mock system: used when launching with use_mock_hardware:=true -->
+  <xacro:if value="$(arg use_mock_hardware)">     <!-- MOCK -->
+    <xacro:mock_ros2_control name="mock"/>
+  </xacro:if>
+
+  <!-- Real hardware: only loaded when use_mock_hardware:=false -->
+  <xacro:unless value="$(arg use_mock_hardware)">
+
+    <!-- Import stepper ros2_control description -->
+    <xacro:stepper_ros2_control name="stepper"/>
+
+    <!-- Import servo ros2_control description -->
+    <xacro:servo_ros2_control name="servo"/>
+
+    <!-- Import talon ros2_control description -->
+    <xacro:talon_ros2_control name="talon"/> 
+  </xacro:unless>
+
+</robot>
