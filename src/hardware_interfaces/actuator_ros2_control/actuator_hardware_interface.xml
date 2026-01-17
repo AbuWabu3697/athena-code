@@ -1,9 +1,0 @@
-<library path="actuator_ros2_control"> <!-- library path which corresponds to cmake. There will be a file called actuator_ros2_control.so somewhere in install-->
-  <class name="actuator_ros2_control/ACTUATORHardwareInterface"
-         type="actuator_ros2_control::ACTUATORHardwareInterface" 
-         base_class_type="hardware_interface::SystemInterface"> <!-- name and type rely on the namespace in the hardware interface. Keep this in mind -->
-    <description>
-      UMDLoop's ros2_control plugin for the ACTUATOR motors
-    </description>
-  </class>
-</library>

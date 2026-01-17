@@ -16,4 +16,12 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/config)
   install(DIRECTORY config DESTINATION share/${PROJECT_NAME}/)
 endif()
 
+# Install controller_switcher script from bringup package if present
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/controller_switcher.py)
+  install(PROGRAMS
+    scripts/controller_switcher.py
+    DESTINATION lib/${PROJECT_NAME}
+  )
+endif()
+
 ament_package()

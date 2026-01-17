@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <xacro:macro name="stepper_ros2_control" params="name">
+
+        <ros2_control name="${name}" type="system">
+
+            <hardware>
+                <plugin>stepper_ros2_control/STEPPERHardwareInterface</plugin>
+            </hardware>
+
+            <joint name="stepper_motor_a">
+                <command_interface name="position"/>
+                <command_interface name="velocity"/>
+                <state_interface name="position"/>
+                <param name="initial_position">0.0</param>
+                <state_interface name="velocity"/>
+                <param name="gear_ratio">1</param>
+
+                <!-- TEMPORARY PARAMETERS -->
+                <param name="joint_orientation">1</param>
+
+            </joint>
+            <joint name="stepper_motor_b">
+                <command_interface name="position"/>
+                <command_interface name="velocity"/>
+                <state_interface name="position"/>
+                <param name="initial_position">0.0</param>
+                <state_interface name="velocity"/>
+                <param name="gear_ratio">1</param>
+
+                <!-- TEMPORARY PARAMETERS -->
+                <param name="joint_orientation">1</param>
+
+            </joint>
+        
+        </ros2_control>
+    
+    </xacro:macro>
+
+</robot>

@@ -23,7 +23,7 @@ def generate_launch_description():
     pkg_share = get_package_share_directory('description')
     
     urdf_file = os.path.join(pkg_share, 'urdf', 'athena_drive.urdf.xacro')
-    controllers_file = os.path.join(pkg_share, 'config', 'athena_drive_controllers.yaml')
+    controllers_file = os.path.join(pkg_share, 'config', 'athena_drive_sim_controllers.yaml')
 
     
     namespace = LaunchConfiguration('namespace')

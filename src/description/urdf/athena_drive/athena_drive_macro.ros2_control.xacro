@@ -48,7 +48,7 @@
     <state_interface name="velocity"/>
   </joint>
   
-  <joint name="${prefix}steer_1_joint">
+  <joint name="${prefix}steer_fl_joint">
     <command_interface name="position">
       <param name="min">0</param>
       <param name="max">6.2832</param>
@@ -59,7 +59,7 @@
     <state_interface name="velocity"/>
   </joint>
   
-  <joint name="${prefix}steer_2_joint">
+  <joint name="${prefix}steer_fr_joint">
     <command_interface name="position">
       <param name="min">0</param>
       <param name="max">6.2832</param>
@@ -70,7 +70,7 @@
     <state_interface name="velocity"/>
   </joint>
   
-  <joint name="${prefix}steer_3_joint">
+  <joint name="${prefix}steer_br_joint">
     <command_interface name="position">
       <param name="min">0</param>
       <param name="max">6.28318530718</param>
@@ -81,7 +81,7 @@
     <state_interface name="velocity"/>
   </joint>
   
-  <joint name="${prefix}steer_4_joint">
+  <joint name="${prefix}steer_bl_joint">
     <command_interface name="position">
       <param name="min">0</param>
       <param name="max">6.2832</param>
@@ -93,7 +93,7 @@
   </joint>
   
 
-  <joint name="${prefix}propulsion_1_joint">
+  <joint name="${prefix}propulsion_fl_joint">
     <command_interface name="velocity"/>
     <state_interface name="position">
       <param name="initial_value">0.0</param>
@@ -101,7 +101,7 @@
     <state_interface name="velocity"/>
   </joint>
 
-  <joint name="${prefix}propulsion_2_joint">
+  <joint name="${prefix}propulsion_fr_joint">
     <command_interface name="velocity"/>
     <state_interface name="position">
       <param name="initial_value">0.0</param>
@@ -110,7 +110,7 @@
   </joint>
   
 
-  <joint name="${prefix}propulsion_3_joint">
+  <joint name="${prefix}propulsion_br_joint">
     <state_interface name="position">
       <param name="initial_value">0.0</param>
     </state_interface>
@@ -118,7 +118,7 @@
   </joint>
   
 
-  <joint name="${prefix}propulsion_4_joint">
+  <joint name="${prefix}propulsion_bl_joint">
     <state_interface name="position">
       <param name="initial_value">0.0</param>
     </state_interface>
@@ -133,6 +133,9 @@
             <parameters>${simulation_controllers}</parameters>
           </xacro:if>
           <controller_manager_node_name>${prefix}controller_manager</controller_manager_node_name>
+          <ros>
+            <remapping>ackermann_steering_controller/tf_odometry:=/tf</remapping>
+          </ros>
         </plugin>
       </gazebo>
     </xacro:if>

@@ -33,22 +33,19 @@ controller_manager:
     joint_group_velocity_controller:              
       type: velocity_controllers/JointGroupVelocityController
 
-    athena_science_manual_controller:
-      type: science_controllers/AthenaScienceManual
+    science_controller:
+      type: science_controllers/ScienceManual
 
 joint_group_position_controller:                
   ros__parameters:
     joints:
       - stepper_motor_a
       - stepper_motor_b
-      - stepper_motor_c
-      - stepper_motor_d
       - talon_lift
       - talon_scoop
       - scoop_a
       - scoop_b
-      - scoop_c
-      - scoop_d
+
       - auger
       - cap
     interface_name: position
@@ -58,27 +55,34 @@ joint_group_velocity_controller:
     joints:
       - stepper_motor_a
       - stepper_motor_b
-      - stepper_motor_c
-      - stepper_motor_d
       - talon_lift
       - talon_scoop
       - auger
+      - scoop_a
+      - scoop_b
+      - auger
+      - cap
     interface_name: velocity
 
-athena_science_manual_controller:
+science_controller:
   ros__parameters:
-    joint_names:
+    joints:
       - stepper_motor_a
       - stepper_motor_b
-      - stepper_motor_c
-      - stepper_motor_d
       - talon_lift
       - talon_scoop
       - scoop_a
       - scoop_b
-      - scoop_c
-      - scoop_d
       - auger
       - cap
+    stepper_motor_a: "stepper_motor_a"
+    stepper_motor_b: "stepper_motor_b"
+    talon_lift: ["talon_lift"]
+    talon_scoop: "talon_scoop"
+    scoop_servos: ["scoop_a", "scoop_b"]
+    #auger_spinner: "auger_spinner"
+    auger: "auger"
+    cap: "cap"
+    interface_name: position 
     command_interfaces: [position, velocity]
     state_interfaces: [position, velocity]

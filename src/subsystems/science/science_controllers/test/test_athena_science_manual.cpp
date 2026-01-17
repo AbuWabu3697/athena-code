@@ -24,11 +24,11 @@ using science_controllers::CMD_MY_ITFS;
 using science_controllers::control_mode_type;
 using science_controllers::STATE_MY_ITFS;
 
-class AthenaScienceManualTest : public AthenaScienceManualFixture<TestableAthenaScienceManual>
+class ScienceManualTest : public ScienceManualFixture<TestableScienceManual>
 {
 };
 
-TEST_F(AthenaScienceManualTest, all_parameters_set_configure_success)
+TEST_F(ScienceManualTest, all_parameters_set_configure_success)
 {
   SetUpController();
 
@@ -44,7 +44,7 @@ TEST_F(AthenaScienceManualTest, all_parameters_set_configure_success)
   ASSERT_EQ(controller_->params_.interface_name, interface_name_);
 }
 
-TEST_F(AthenaScienceManualTest, check_exported_intefaces)
+TEST_F(ScienceManualTest, check_exported_intefaces)
 {
   SetUpController();
 
@@ -65,7 +65,7 @@ TEST_F(AthenaScienceManualTest, check_exported_intefaces)
   }
 }
 
-TEST_F(AthenaScienceManualTest, activate_success)
+TEST_F(ScienceManualTest, activate_success)
 {
   SetUpController();
 
@@ -88,7 +88,7 @@ TEST_F(AthenaScienceManualTest, activate_success)
   ASSERT_TRUE(std::isnan((*msg)->duration));
 }
 
-TEST_F(AthenaScienceManualTest, update_success)
+TEST_F(ScienceManualTest, update_success)
 {
   SetUpController();
 
@@ -100,7 +100,7 @@ TEST_F(AthenaScienceManualTest, update_success)
     controller_interface::return_type::OK);
 }
 
-TEST_F(AthenaScienceManualTest, deactivate_success)
+TEST_F(ScienceManualTest, deactivate_success)
 {
   SetUpController();
 
@@ -109,7 +109,7 @@ TEST_F(AthenaScienceManualTest, deactivate_success)
   ASSERT_EQ(controller_->on_deactivate(rclcpp_lifecycle::State()), NODE_SUCCESS);
 }
 
-TEST_F(AthenaScienceManualTest, reactivate_success)
+TEST_F(ScienceManualTest, reactivate_success)
 {
   SetUpController();
 
@@ -126,7 +126,7 @@ TEST_F(AthenaScienceManualTest, reactivate_success)
     controller_interface::return_type::OK);
 }
 
-TEST_F(AthenaScienceManualTest, test_setting_slow_mode_service)
+TEST_F(ScienceManualTest, test_setting_slow_mode_service)
 {
   SetUpController();
 
@@ -152,7 +152,7 @@ TEST_F(AthenaScienceManualTest, test_setting_slow_mode_service)
   ASSERT_EQ(*(controller_->control_mode_.readFromRT()), control_mode_type::FAST);
 }
 
-TEST_F(AthenaScienceManualTest, test_update_logic_fast)
+TEST_F(ScienceManualTest, test_update_logic_fast)
 {
   SetUpController();
   rclcpp::executors::MultiThreadedExecutor executor;
@@ -181,7 +181,7 @@ TEST_F(AthenaScienceManualTest, test_update_logic_fast)
   EXPECT_EQ(*(controller_->control_mode_.readFromRT()), control_mode_type::FAST);
 }
 
-TEST_F(AthenaScienceManualTest, test_update_logic_slow)
+TEST_F(ScienceManualTest, test_update_logic_slow)
 {
   SetUpController();
   rclcpp::executors::MultiThreadedExecutor executor;
@@ -212,7 +212,7 @@ TEST_F(AthenaScienceManualTest, test_update_logic_slow)
   EXPECT_TRUE(std::isnan((*(controller_->input_ref_.readFromRT()))->displacements[0]));
 }
 
-TEST_F(AthenaScienceManualTest, publish_status_success)
+TEST_F(ScienceManualTest, publish_status_success)
 {
   SetUpController();
 
@@ -229,7 +229,7 @@ TEST_F(AthenaScienceManualTest, publish_status_success)
   ASSERT_EQ(msg.set_point, 101.101);
 }
 
-TEST_F(AthenaScienceManualTest, receive_message_and_publish_updated_status)
+TEST_F(ScienceManualTest, receive_message_and_publish_updated_status)
 {
   SetUpController();
   rclcpp::executors::MultiThreadedExecutor executor;

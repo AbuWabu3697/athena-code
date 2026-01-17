@@ -14,6 +14,8 @@
   <xacro:include filename="$(find description)/urdf/athena_drive/athena_drive_macro.ros2_control.xacro"/>
   <xacro:include filename="imu.xacro"/>
   <xacro:include filename="gps.xacro"/>
+  <xacro:include filename="ground_truth_odom.xacro"/>
+  <xacro:include filename="depth_camera.xacro"/> 
 
 
   <!-- Load robot's macro with parameters -->
@@ -34,8 +36,23 @@
   <!-- Import odrive ros2_control description -->
   <xacro:include filename="$(find description)/ros2_control/drive/drive.odrive.ros2_control.xacro" />
 
-
+  <!-- Contains description of drive -->
   <xacro:description/>
+
+
+  <xacro:imu_sensor parent="base_footprint">
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+  </xacro:imu_sensor>
+
+  <xacro:gps_sensor parent="base_footprint">
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+  </xacro:gps_sensor>
+
+  <xacro:ground_truth_odometry robot_base_frame="base_footprint"/>
+
+  <xacro:depth_camera parent_link="base_link"> 
+      <origin xyz="0.75 0 -0.37" rpy="0 0 0"/> 
+  </xacro:depth_camera>
 
   <xacro:if value="$(arg use_mock_hardware)">
     <xacro:athena_drive_ros2_control
@@ -47,8 +64,8 @@
     simulation_controllers="$(arg simulation_controllers)"/>
   </xacro:if>
   <xacro:unless value="$(arg use_mock_hardware)">
-    <xacro:rmd_ros2_control name="rmd"/>
     <xacro:odrive_ros2_control name="odrive"/>
+    <xacro:rmd_ros2_control name="rmd"/>
   </xacro:unless>
 
   

@@ -13,21 +13,13 @@ find_package(ament_cmake REQUIRED)
 
 find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_runtime REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
 
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/SetController.srv"
-)
 
 install(
   DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(PROGRAMS
-  scripts/controller_switcher.py
-  DESTINATION lib/${PROJECT_NAME}
-)
 
 if(BUILD_TESTING)
 endif()

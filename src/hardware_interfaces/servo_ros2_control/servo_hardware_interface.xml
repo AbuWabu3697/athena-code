@@ -1,0 +1,9 @@
+<library path="servo_ros2_control"> <!-- library path which corresponds to cmake. -->
+  <class name="servo_ros2_control/SERVOHardwareInterface"
+         type="servo_ros2_control::SERVOHardwareInterface" 
+         base_class_type="hardware_interface::SystemInterface"> <!-- name and type rely on the namespace in the hardware interface. Keep this in mind -->
+    <description>
+      UMDLoop's ros2_control plugin for the SERVO motors
+    </description>
+  </class>
+</library>

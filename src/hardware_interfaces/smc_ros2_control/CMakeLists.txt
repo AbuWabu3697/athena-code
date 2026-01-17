@@ -12,6 +12,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp_lifecycle
   realtime_tools
   msgs
+  umdloop_can_library
 )
 
 # find dependencies
@@ -39,6 +40,9 @@ target_include_directories(smc_ros2_control PUBLIC
 $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
 $<INSTALL_INTERFACE:include/smc_ros2_control>
 )
+
+# Link directly to umdloop_can_library target
+target_link_libraries(smc_ros2_control PUBLIC umdloop_can_library::umdloop_can_library)
 
 ament_target_dependencies(
   smc_ros2_control PUBLIC

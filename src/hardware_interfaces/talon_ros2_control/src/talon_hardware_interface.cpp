@@ -242,7 +242,7 @@ hardware_interface::return_type talon_ros2_control::TALONHardwareInterface::writ
                                                               joint_command_velocity_[i]);
       }
     } else {
-      RCLCPP_INFO(rclcpp::get_logger("TALONHardwareInterface"), "Joint command value not found or undefined command state");
+      // RCLCPP_INFO(rclcpp::get_logger("TALONHardwareInterface"), "Joint command value not found or undefined command state");
     }
   }
   

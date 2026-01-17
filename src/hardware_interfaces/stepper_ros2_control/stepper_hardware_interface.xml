@@ -1,0 +1,9 @@
+<library path="stepper_ros2_control"> <!-- library path which corresponds to cmake. There will be a file called stepper_ros2_control.so somewhere in install-->
+  <class name="stepper_ros2_control/STEPPERHardwareInterface"
+         type="stepper_ros2_control::STEPPERHardwareInterface" 
+         base_class_type="hardware_interface::SystemInterface"> <!-- name and type rely on the namespace in the hardware interface. Keep this in mind -->
+    <description>
+      UMDLoop's ros2_control plugin for the STEPPER motors
+    </description>
+  </class>
+</library>

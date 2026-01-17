@@ -50,8 +50,8 @@ publisher_joint_trajectory_controller:
 
     joints:
       - suspension_left_joint
-      - swerve_module_front_left_joint
-      - wheel_front_left_joint
+      - steer_fl_joint
+      - propulsion_fl_joint
       - swerve_module_back_joint
-      - wheel_back_left_joint
+      - propulsion_bl_joint
       - suspension_right_joint

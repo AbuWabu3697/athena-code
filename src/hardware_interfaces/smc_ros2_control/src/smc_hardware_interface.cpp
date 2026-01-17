@@ -58,29 +58,22 @@ hardware_interface::CallbackReturn SMCHardwareInterface::on_init(
   for (auto& joint : info_.joints) {
     joint_node_ids.push_back(std::stoi(joint.parameters.at("node_id")));
     joint_gear_ratios.push_back(std::stoi(joint.parameters.at("gear_ratio")));
-    initial_position_.push_back(std::stof(joint.state_interfaces[0].initial_value));
   }
 
   num_joints = static_cast<int>(info_.joints.size());
   
   // Initializes command and state interface values
-  joint_state_position_.assign(num_joints, 0);
-  joint_state_position_ = initial_position_; //EXPERIMENTING, THIS NEEDS TO CHANGE
+  joint_state_position_.assign(num_joints, std::numeric_limits<double>::quiet_NaN());
   joint_state_velocity_.assign(num_joints, 0);
 
-  joint_command_position_.assign(num_joints, 0);
-  // joint_command_position_ = initial_position_;
+  joint_command_position_.assign(num_joints, std::numeric_limits<double>::quiet_NaN());
   joint_command_velocity_.assign(num_joints, 0);
 
-  encoder_position = 0;
-  motor_position = 0;
-  motor_velocity = 0;
-
-  joint_initialization_.assign(num_joints, false);
+  encoder_position.assign(num_joints, 0.0);
+  motor_position.assign(num_joints, 0.0);
+  motor_velocity.assign(num_joints, 0.0);
 
   control_level_.resize(num_joints, integration_level_t::POSITION);
-
-  current_iteration = 0;
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -131,23 +124,96 @@ SMCHardwareInterface::export_command_interfaces()
 hardware_interface::CallbackReturn SMCHardwareInterface::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // TODO: Find a way to publish from the lifecyle node itself rather than create our own node within it
-  // Node to publish to umdloop_can_node
-  node_ = rclcpp::Node::make_shared("smc_hardware_node");
-  smc_can_publisher_ = node_->create_publisher<msgs::msg::CANA>("can_tx", 10);
-
-  // Lambda function that takes the message as a shared pointer, dereferences it, 
-  // and stores it in received_joint_data_ to be used
-  smc_can_subscriber_ = node_->create_subscription<msgs::msg::CANA>(
-      "can_rx", 
-      rclcpp::QoS(50).reliable(), 
-      [this](const msgs::msg::CANA::SharedPtr received_message) 
-      {
-        received_joint_data_ = *received_message;
-      }
-  );
+  if (!canBus.open("can0", std::bind(&SMCHardwareInterface::onCanMessage, this, std::placeholders::_1))) {
+    RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Failed to open CAN interface");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
   
   return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+void SMCHardwareInterface::onCanMessage(const CANLib::CanFrame& frame) {
+  can_rx_frame_ = frame; // Store the received frame for processing in read()
+
+  std::string result;
+
+  int data[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+for(int i = 0; i < num_joints; i++){  
+    if(can_rx_frame_.id == joint_node_ids[i] && can_rx_frame_.data[0] == 0x9C){
+
+      // DECODING CAN MESSAGE FOR VELOCITY
+      data[0] = 0x9C;
+      data[1] = can_rx_frame_.data[1]; // Motor Temperature
+      data[2] = can_rx_frame_.data[2]; // Torque low byte
+      data[3] = can_rx_frame_.data[3]; // Torque high byte
+      data[4] = can_rx_frame_.data[4]; // speed low byte
+      data[5] = can_rx_frame_.data[5]; // speed high byte
+      data[6] = can_rx_frame_.data[6]; // encoder position low byte
+      data[7] = can_rx_frame_.data[7]; // encoder position high byte
+
+      // ENCODER POSITION 
+      // uint16 -> int16 -> double (for calcs)
+      encoder_position[i] = static_cast<double>(static_cast<int16_t>((data[7] << 8) | data[6]));
+
+      // SPEED
+      // uint16 -> int16 -> double (for calcs)
+      motor_velocity[i] = static_cast<double>(static_cast<int16_t>((data[5] << 8) | data[4]));
+
+      //CALCULATING JOINT STATE
+      joint_state_velocity_[i] = calculate_joint_velocity_from_motor_velocity(motor_velocity[i], joint_gear_ratios[i]);
+
+    }
+    else if(can_rx_frame_.id == joint_node_ids[i] && can_rx_frame_.data[0] == 0x92){
+      data[0] = 0x92;
+      data[1] = can_rx_frame_.data[1]; // Multi-turn low byte
+      data[2] = can_rx_frame_.data[2];
+      data[3] = can_rx_frame_.data[3];
+      data[4] = can_rx_frame_.data[4];
+      data[5] = can_rx_frame_.data[5]; 
+      data[6] = can_rx_frame_.data[6];
+      data[7] = can_rx_frame_.data[7]; // Multi-turn high byte
+
+      // POSITION
+      // TODO: This sign extension may only work when the value is negative, look into it
+      // In this case, we have 56 bits to store in 64, so we must have a sign extension
+      // uint64 -> int64 (to do sign extension) -> sign extension (left shift 8, then arithmetic right shift 8) --> double (for calcs)
+      uint64_t motor_position_raw = (static_cast<uint64_t>(data[7]) << 48)   | 
+                                    (static_cast<uint64_t>(data[6]) << 40)   | 
+                                    (static_cast<uint64_t>(data[5]) << 32)   |
+                                    (static_cast<uint64_t>(data[4]) << 24)   | 
+                                    (static_cast<uint64_t>(data[3]) << 16)   | 
+                                    (static_cast<uint64_t>(data[2]) << 8)    | 
+                                     static_cast<uint64_t>(data[1]);
+
+      motor_position[i] = static_cast<double>((static_cast<int64_t>(motor_position_raw) << 8) >> 8);
+
+      if(DEBUG_MODE == 1) {
+        for(int j = 0; j < 8; j++){
+          RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Received at index %d: %d", j, can_rx_frame_.data[j]);
+        }
+        RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Motor Position: %f", motor_position[i]);
+      }
+
+      joint_state_position_[i] = calculate_joint_position_from_motor_position(motor_position[i], joint_gear_ratios[i]);
+      
+    }
+    else{
+      if(DEBUG_MODE == 1) {
+        RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Reply not heard.");
+      }
+    }    
+    
+    if(DEBUG_MODE == 1) {
+      RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Reading for joint: %s Joint position: %f Joint velocity: %f \nJoint Initialization State: %d \n", 
+                                                          info_.joints[i].name.c_str(),
+                                                          joint_state_position_[i], 
+                                                          joint_state_velocity_[i],
+                                                          static_cast<int>(joint_initialization_[i]));
+    }
+
+  }
+
 }
 
 hardware_interface::CallbackReturn SMCHardwareInterface::on_cleanup(
@@ -155,18 +221,16 @@ hardware_interface::CallbackReturn SMCHardwareInterface::on_cleanup(
 {
   // If cleanup occurs before shutdown, this is the last opportunity to shutdown motor since pointers must be deleted here
   for(int i = 0; i < num_joints; i++){
-    auto joint_tx = msgs::msg::CANA();
-    joint_tx.id = joint_node_ids[i];
+    can_tx_frame_ = CANLib::CanFrame();
+    can_tx_frame_.id = joint_node_ids[i];
+    can_tx_frame_.dlc = 8;
         
     // Motor Off (Shutdown) Command
-    joint_tx.data = {0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    smc_can_publisher_->publish(joint_tx);
+    can_tx_frame_.data = {0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    canBus.send(can_tx_frame_);
   }
 
-  // Reset shared pointers which essentially deletes it
-  smc_can_publisher_.reset();
-  smc_can_subscriber_.reset();
-  node_.reset();
+  canBus.close();
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -177,20 +241,23 @@ hardware_interface::CallbackReturn SMCHardwareInterface::on_activate(
 {
   RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Activating ...please wait...");
 
-
   for(int i = 0; i < num_joints; i++){
-    auto joint_tx = msgs::msg::CANA();
-    control_level_[i] = integration_level_t::UNDEFINED;
+    can_tx_frame_ = CANLib::CanFrame();
+    can_tx_frame_.id = joint_node_ids[i];
+    can_tx_frame_.dlc = 8;
 
-    joint_tx.id = joint_node_ids[i];
-    joint_tx.data = {0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    smc_can_publisher_->publish(joint_tx);
+
+    can_tx_frame_.data = {0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    canBus.send(can_tx_frame_);
+    control_level_[i] = integration_level_t::UNDEFINED;
   }
 
   // Sets initial command to joint state
-  // TODO: Currently implemented by initial position parameter, but it should read initial state and then populate
-  joint_command_position_ = joint_state_position_;
-  // joint_command_position_ = initial_position_;
+  // joint_command_position_ = joint_state_position_;
+  for (size_t i = 0; i < joint_state_velocity_.size(); ++i) {
+    RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Joint %zu command vel in on_init: %f", i, joint_state_velocity_[i]);    
+    RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Joint %zu joint command in on_activate: %f", i, joint_command_position_[i]);
+  }
 
   RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Successfully activated!");
 
@@ -204,12 +271,13 @@ hardware_interface::CallbackReturn SMCHardwareInterface::on_deactivate(
   RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Deactivating ...please wait...");
 
   for(int i = 0; i < num_joints; i++){
-    auto joint_tx = msgs::msg::CANA();
-    joint_tx.id = joint_node_ids[i];
+    can_tx_frame_ = CANLib::CanFrame();
+    can_tx_frame_.id = joint_node_ids[i];
+    can_tx_frame_.dlc = 8;
 
     // Motor Stop Command
-    joint_tx.data = {0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    smc_can_publisher_->publish(joint_tx);
+    can_tx_frame_.data = {0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    canBus.send(can_tx_frame_);
   }
 
   RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Successfully deactivated all SMC motors!");
@@ -240,120 +308,37 @@ int32_t SMCHardwareInterface::calculate_motor_velocity_from_desired_joint_veloci
 hardware_interface::return_type SMCHardwareInterface::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  if (rclcpp::ok())
-  {
-    rclcpp::spin_some(node_);
-  }
-
   int data[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
   // Since you can't publish two messages in one sweep without a delay, every other iteration of read
   // will call angle or velocity messages
-  current_iteration++;
   for(int i = 0; i < num_joints; i++){
-    auto joint_tx = msgs::msg::CANA();
-    joint_tx.id = joint_node_ids[i];
-    if(current_iteration%2 == 0){
-      // Command to read multi-turn angle
-      joint_tx.data = {0x92, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    }
-    else if(current_iteration%2 == 1){
-      // Command to read motor status 2
-      joint_tx.data = {0x9C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    }
-    smc_can_publisher_->publish(joint_tx);
+    can_tx_frame_ = CANLib::CanFrame();
+    can_tx_frame_.id = joint_node_ids[i];
+    can_tx_frame_.dlc = 8;
+
+    // Command to read multi-turn angle
+    can_tx_frame_.data = {0x92, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    canBus.send(can_tx_frame_);
+    
+    // Command to read motor status 2
+    can_tx_frame_.data = {0x9C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    canBus.send(can_tx_frame_);
   }
 
   // Values retrieved
   for(int i = 0; i < num_joints; i++){  
-    if(received_joint_data_.id == joint_node_ids[i] && received_joint_data_.data[0] == 0x9C){
 
-      // DECODING CAN MESSAGE FOR VELOCITY
-      data[0] = 0x9C;
-      data[1] = received_joint_data_.data[1]; // Motor Temperature
-      data[2] = received_joint_data_.data[2]; // Torque low byte
-      data[3] = received_joint_data_.data[3]; // Torque high byte
-      data[4] = received_joint_data_.data[4]; // speed low byte
-      data[5] = received_joint_data_.data[5]; // speed high byte
-      data[6] = received_joint_data_.data[6]; // encoder position low byte
-      data[7] = received_joint_data_.data[7]; // encoder position high byte
-
-      // ENCODER POSITION 
-      // uint16 -> int16 -> double (for calcs)
-      encoder_position = static_cast<double>(static_cast<int16_t>((data[7] << 8) | data[6]));
-
-      // SPEED
-      // uint16 -> int16 -> double (for calcs)
-      motor_velocity = static_cast<double>(static_cast<int16_t>((data[5] << 8) | data[4]));
-
-      //CALCULATING JOINT STATE
-      joint_state_velocity_[i] = calculate_joint_velocity_from_motor_velocity(motor_velocity, joint_gear_ratios[i]);
-
-    }
-    else if(received_joint_data_.id == joint_node_ids[i] && received_joint_data_.data[0] == 0x92){
-      // RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Triggered - Joint: %d, Command: %d", joint_node_ids[i], received_joint_data_.data[0]);
-      data[0] = 0x92;
-      data[1] = received_joint_data_.data[1]; // Multi-turn low byte
-      data[2] = received_joint_data_.data[2];
-      data[3] = received_joint_data_.data[3];
-      data[4] = received_joint_data_.data[4];
-      data[5] = received_joint_data_.data[5]; 
-      data[6] = received_joint_data_.data[6];
-      data[7] = received_joint_data_.data[7]; // Multi-turn high byte
-
-      // POSITION
-      // TODO: This sign extension may only work when the value is negative, look into it
-      // In this case, we have 56 bits to store in 64, so we must have a sign extension
-      // uint64 -> sign extension -> int64 -> double (for calcs)
-      uint64_t motor_position_unsigned = 0xFF |  
-      ((static_cast<uint64_t>(data[7]) << 48) | 
-      (static_cast<uint64_t>(data[6]) << 40)  | 
-      (static_cast<uint64_t>(data[5]) << 32)  |
-      (static_cast<uint64_t>(data[4]) << 24)  | 
-      (static_cast<uint64_t>(data[3]) << 16)  | 
-      (static_cast<uint64_t>(data[2]) << 8)   | 
-      static_cast<uint64_t>(data[1]));
-
-      motor_position = static_cast<double>(static_cast<int64_t>(0xFF00000000000000|  
-                                          (static_cast<uint64_t>(data[7]) << 48)  | 
-                                          (static_cast<uint64_t>(data[6]) << 40)  | 
-                                          (static_cast<uint64_t>(data[5]) << 32)  |
-                                          (static_cast<uint64_t>(data[4]) << 24)  | 
-                                          (static_cast<uint64_t>(data[3]) << 16)  | 
-                                          (static_cast<uint64_t>(data[2]) << 8)   | 
-                                          static_cast<uint64_t>(data[1])));
-
-      if(DEBUG_MODE == 1) {
-        for(int j = 0; j < 8; j++){
-          RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Received at index %d: %d", j, received_joint_data_.data[j]);
-        }
-        RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Motor Position: %f", motor_position);
-      }
-
-      joint_state_position_[i] = calculate_joint_position_from_motor_position(motor_position, joint_gear_ratios[i]);
-      // RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Calculated Motor Position: %f", joint_state_position_[i]);
-
-      // This initializes the command position for the joint (temporary solution)
-      // if(!joint_initialization_[i]){
-      //   joint_command_position_[i] = joint_state_position_[i];
-      //   joint_initialization_[i] = true;
-      // }
-      
-    }
-    else{
-      if(DEBUG_MODE == 1) {
-        RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Reply not heard.");
-      }
-    }    
+    //CALCULATING JOINT STATE
+    joint_state_velocity_[i] = calculate_joint_velocity_from_motor_velocity(motor_velocity[i], joint_gear_ratios[i]);
+    joint_state_position_[i] = calculate_joint_position_from_motor_position(motor_position[i], joint_gear_ratios[i]);
     
     if(DEBUG_MODE == 1) {
-      RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Reading for joint: %s Joint position: %f Joint velocity: %f \nJoint Initialization State: %d \n", 
+      RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Reading for joint: %s Joint position: %f Joint velocity: %f \n", 
                                                           info_.joints[i].name.c_str(),
                                                           joint_state_position_[i], 
-                                                          joint_state_velocity_[i],
-                                                          static_cast<int>(joint_initialization_[i]));
+                                                          joint_state_velocity_[i]);
     }
-
   }
   return hardware_interface::return_type::OK;
 }
@@ -368,8 +353,9 @@ hardware_interface::return_type smc_ros2_control::SMCHardwareInterface::write(
   int32_t joint_velocity = 0;
   
   for(int i = 0; i < num_joints; i++) {
-    auto joint_tx = msgs::msg::CANA(); // Must reinstantiate else data from past iteration gets repeated
-    joint_tx.id = joint_node_ids[i];
+    can_tx_frame_ = CANLib::CanFrame(); // Must reinstantiate else data from past iteration gets repeated
+    can_tx_frame_.id = joint_node_ids[i];
+    can_tx_frame_.dlc = 8;
 
     if(control_level_[i] == integration_level_t::POSITION && std::isfinite(joint_command_position_[i])) {
       
@@ -415,14 +401,16 @@ hardware_interface::return_type smc_ros2_control::SMCHardwareInterface::write(
     
     }
     else{
-      RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Joint command value not found or undefined command state");
+      // RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), "Joint command value not found or undefined command state");
     }
 
+    // Cast data to uint8_t
     for(int j = 0; j < 8; j++){
-      joint_tx.data.push_back(static_cast<uint8_t>(data[j]));
+      data[j] = static_cast<uint8_t>(data[j]);
+      can_tx_frame_.data[j] = data[j];
     }
     
-    smc_can_publisher_->publish(joint_tx);
+    canBus.send(can_tx_frame_);
   }
    
   return hardware_interface::return_type::OK;
@@ -432,48 +420,82 @@ hardware_interface::return_type SMCHardwareInterface::perform_command_mode_switc
   const std::vector<std::string>& start_interfaces,
   const std::vector<std::string>& stop_interfaces)
 {
-  std::vector<integration_level_t> new_modes = {};
-  for (std::string key : start_interfaces)
-  {
-    for (int i = 0; i < num_joints; i++){
-      if (key == info_.joints[i].name + "/" + hardware_interface::HW_IF_POSITION){
-        new_modes.push_back(integration_level_t::POSITION);
-      }
-      if (key == info_.joints[i].name + "/" + hardware_interface::HW_IF_VELOCITY){
-        new_modes.push_back(integration_level_t::VELOCITY);
+  // Debug: print incoming requests
+  std::ostringstream ss;
+  ss << "perform_command_mode_switch called. start_interfaces: [";
+  for (auto &s : start_interfaces) ss << s << ",";
+  ss << "] stop_interfaces: [";
+  for (auto &s : stop_interfaces) ss << s << ",";
+  ss << "]";
+  RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"), ss.str().c_str());
+
+  // For each joint, decide its new control mode based on start/stop interfaces.
+  // We allow partial starts/stops: only affected joints are switched.
+  std::vector<integration_level_t> requested_modes(num_joints, integration_level_t::UNDEFINED);
+
+  // Process stop interfaces first: mark those joints as UNDEFINED
+  for (const auto &ifname : stop_interfaces) {
+    for (int i = 0; i < num_joints; ++i) {
+      const std::string pos_if = info_.joints[i].name + "/" + std::string(hardware_interface::HW_IF_POSITION);
+      const std::string vel_if = info_.joints[i].name + "/" + std::string(hardware_interface::HW_IF_VELOCITY);
+      if (ifname == pos_if || ifname == vel_if || ifname.find(info_.joints[i].name) != std::string::npos) {
+        requested_modes[i] = integration_level_t::UNDEFINED;
       }
     }
-  }
-  // All joints must be given new command mode at the same time
-  if (new_modes.size() != static_cast<unsigned long>(num_joints)){
-    return hardware_interface::return_type::ERROR;
-  }
-  // All joints must have the same command mode
-  if (!std::all_of(
-        new_modes.begin() + 1, new_modes.end(),
-        [&](integration_level_t mode) { return mode == new_modes[0]; }))
-  {
-    return hardware_interface::return_type::ERROR;
   }
 
-  // Stop motion on all relevant joints that are stopping
-  for (std::string key : stop_interfaces) {
-    for (int i = 0; i < num_joints; i++) {
-      if (key.find(info_.joints[i].name) != std::string::npos) {
-        // fix this
-        joint_command_position_[i] = initial_position_[i];
-        joint_command_velocity_[i] = 0;
-        control_level_[i] = integration_level_t::UNDEFINED;  // Revert to undefined
+  // Process start interfaces: set POSITION or VELOCITY per joint
+  for (const auto &ifname : start_interfaces) {
+    for (int i = 0; i < num_joints; ++i) {
+      const std::string pos_if = info_.joints[i].name + "/" + std::string(hardware_interface::HW_IF_POSITION);
+      const std::string vel_if = info_.joints[i].name + "/" + std::string(hardware_interface::HW_IF_VELOCITY);
+      if (ifname == pos_if) {
+        requested_modes[i] = integration_level_t::POSITION;
+      } else if (ifname == vel_if) {
+        requested_modes[i] = integration_level_t::VELOCITY;
       }
     }
   }
-  // Set the new command modes. By this point everything should be undefined after the "stop motion" loop
-  for (int i = 0; i < num_joints; i++) {
-    if (control_level_[i] != integration_level_t::UNDEFINED) {
-      // Something else is using the joint! Abort!
-      return hardware_interface::return_type::ERROR;
+
+  // Now apply the requested_modes to control_level_.
+  // For any joint with UNDEFINED in requested_modes, we only change it if it was explicitly stopped.
+  for (int i = 0; i < num_joints; ++i) {
+    if (requested_modes[i] == integration_level_t::UNDEFINED) {
+      // if stop requested, set to UNDEFINED; otherwise leave existing mode
+      // (we only set to UNDEFINED if this joint was mentioned in stop_interfaces)
+      bool was_stopped = false;
+      for (const auto &ifname : stop_interfaces) {
+        if (ifname.find(info_.joints[i].name) != std::string::npos) {
+          was_stopped = true;
+          break;
+        }
+      }
+      if (was_stopped) {
+        control_level_[i] = integration_level_t::UNDEFINED;
+        joint_command_velocity_[i] = 0;
+        // optional: reset position cmd to current state to be safe
+        joint_command_position_[i] = joint_state_position_[i];
+        RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"),
+          "Joint %s: stopped -> set UNDEFINED", info_.joints[i].name.c_str());
+      }
+      // else, leave control_level_ as-is
+    } else {
+      // Set the mode requested
+      control_level_[i] = requested_modes[i];
+      // If switching to velocity, optionally set command velocity to current state to avoid jumps
+      if (requested_modes[i] == integration_level_t::VELOCITY) {
+        // joint_command_velocity_[i] = joint_state_velocity_[i];
+        joint_command_velocity_[i] = 0;
+        RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"),
+          "Joint %s: switched to VELOCITY (cmd vel initialized from state: %f)",
+          info_.joints[i].name.c_str(), joint_command_velocity_[i]);
+      } else if (requested_modes[i] == integration_level_t::POSITION) {
+        joint_command_position_[i] = joint_state_position_[i];
+        RCLCPP_INFO(rclcpp::get_logger("SMCHardwareInterface"),
+          "Joint %s: switched to POSITION (cmd pos initialized from state: %f)",
+          info_.joints[i].name.c_str(), joint_command_position_[i]);
+      }
     }
-    control_level_[i] = new_modes[i];
   }
 
   return hardware_interface::return_type::OK;

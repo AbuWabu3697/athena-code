@@ -21,7 +21,7 @@
 #include "rclcpp/utilities.hpp"
 #include "ros2_control_test_assets/descriptions.hpp"
 
-TEST(TestLoadAthenaScienceManual, load_controller)
+TEST(TestLoadScienceManual, load_controller)
 {
   rclcpp::init(0, nullptr);
 
@@ -32,7 +32,7 @@ TEST(TestLoadAthenaScienceManual, load_controller)
     executor, ros2_control_test_assets::minimal_robot_urdf, "test_controller_manager");
 
   ASSERT_NO_THROW(
-    cm.load_controller("test_science_controllers", "science_controllers/AthenaScienceManual"));
+    cm.load_controller("test_science_controllers", "science_controllers/ScienceManual"));
 
   rclcpp::shutdown();
 }

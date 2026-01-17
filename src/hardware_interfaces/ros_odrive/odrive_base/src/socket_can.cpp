@@ -74,8 +74,24 @@ void SocketCanIntf::deinit() {
     broken_ = true;
 }
 
+#include <poll.h>
+
+bool can_write_ready(int socket_id) {
+    struct pollfd pfd{};
+    pfd.fd = socket_id;
+    pfd.events = POLLOUT;
+
+    int ret = poll(&pfd, 1, 0);  // timeout 0 = non-blocking check
+    return (ret > 0 && (pfd.revents & POLLOUT));
+}
+
+
 bool SocketCanIntf::send_can_frame(const can_frame& frame) {
     ssize_t nbytes = write(socket_id_, &frame, sizeof(frame));
+    if (!can_write_ready(socket_id_)) {
+        std::cerr << "CAN socket not ready to send (buffer full)" << std::endl;
+    }
+
     if (nbytes == -1) {
         std::cerr << "Failed to send CAN frame" << std::endl;
         return false;

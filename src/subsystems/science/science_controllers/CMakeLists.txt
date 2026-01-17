@@ -27,32 +27,32 @@ foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
 endforeach()
 
-# Add athena_science_manual library related compile commands
+# Add science_manual library related compile commands
 generate_parameter_library(
-  athena_science_manual_parameters
-  src/athena_science_manual.yaml
-  include/athena_science_controllers/validate_science_controller_parameters.hpp
+  science_manual_parameters
+  src/science_controller.yaml
+  include/science_controllers/validate_science_controller_parameters.hpp
 )
 
 add_library(
-  athena_science_manual
+  science_manual
   SHARED
-  src/athena_science_manual.cpp
+  src/science_controller.cpp
 )
-target_include_directories(athena_science_manual PUBLIC
+target_include_directories(science_manual PUBLIC
   "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
-target_link_libraries(athena_science_manual athena_science_manual_parameters)
-ament_target_dependencies(athena_science_manual ${THIS_PACKAGE_INCLUDE_DEPENDS})
-target_compile_definitions(athena_science_manual PRIVATE "ATHENA_SCIENCE_MANUAL_BUILDING_DLL")
+target_link_libraries(science_manual science_manual_parameters)
+ament_target_dependencies(science_manual ${THIS_PACKAGE_INCLUDE_DEPENDS})
+target_compile_definitions(science_manual PRIVATE "SCIENCE_MANUAL_BUILDING_DLL")
 
 pluginlib_export_plugin_description_file(
-  controller_interface athena_science_controllers.xml)
+  controller_interface science_controllers.xml)
 
 install(
   TARGETS
-  athena_science_manual
+  science_manual
   RUNTIME DESTINATION bin
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -106,7 +106,7 @@ ament_export_dependencies(
   ${THIS_PACKAGE_INCLUDE_DEPENDS}
 )
 ament_export_libraries(
-  athena_science_manual
+  science_manual
 )
 
 ament_package()

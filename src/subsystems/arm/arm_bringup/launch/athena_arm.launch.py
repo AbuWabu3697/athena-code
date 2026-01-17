@@ -44,7 +44,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "controllers_file",
-            default_value="arm_controllers.yaml",
+            default_value="athena_arm_controllers.yaml",
             description="YAML file with the controllers configuration.",
         )
     )
@@ -376,7 +376,7 @@ def generate_launch_description():
     return LaunchDescription(
         declared_arguments +
         [
-            umdloop_can_node,
+            # umdloop_can_node,
             control_node,
             joystick_publisher,
             # joint_state_publisher, # sends 0s to /joint_states

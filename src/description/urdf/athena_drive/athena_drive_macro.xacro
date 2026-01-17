@@ -185,7 +185,7 @@
       <limit effort="0" lower="${radians(-180)}" upper="${radians(180)}" velocity="${radians(180)}"/>
     </joint>
     <!-- joint 2 -->
-    <joint name="${prefix}swerve_module_front_left_joint" type="revolute">
+    <joint name="${prefix}steer_fl_joint" type="revolute">
       <origin xyz="0 0 -0.3" rpy="${pi/2} 0 0"/>
       <parent link="${prefix}link1"/>
       <child link="${prefix}link2"/>
@@ -193,7 +193,7 @@
       <limit effort="0" lower="${radians(-180)}" upper="${radians(180)}" velocity="${radians(180)}"/>
     </joint>
     <!-- joint 3 -->
-    <joint name="${prefix}wheel_front_left_joint" type="revolute">
+    <joint name="${prefix}propulsion_fl_joint" type="revolute">
       <origin xyz="0.8 0 0" rpy="0 0 0"/>
       <parent link="${prefix}link2"/>
       <child link="${prefix}link3"/>
@@ -209,7 +209,7 @@
       <limit effort="0" lower="${radians(-360)}" upper="${radians(360)}" velocity="${radians(360)}"/>
     </joint>
     <!-- joint 5 -->
-    <joint name="${prefix}wheel_back_left_joint" type="revolute">
+    <joint name="${prefix}propulsion_bl_joint" type="revolute">
       <origin xyz="0 0 -0.15" rpy="0 ${pi/2} 0"/>
       <parent link="${prefix}link4"/>
       <child link="${prefix}link5"/>
