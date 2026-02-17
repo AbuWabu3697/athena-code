@@ -23,6 +23,7 @@ setup(
             'my_node = yolo_ros.my_node:main',
             'yolo_ros = yolo_ros.image_publisher:main',
             'inference = yolo_ros.img_inference:main',
+            'yolo_live_logger = yolo_ros.yolo_live_logger:main',
         ],
     },
 )
