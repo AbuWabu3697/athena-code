@@ -26,7 +26,7 @@ class YoloLiveLoggerNode(Node):
         default_model_path = os.path.join(pkg_share, "models", "best.pt")
 
         self.declare_parameter("model_path", default_model_path)
-        self.declare_parameter("image_topic", "/zed/zed_node/left/image_rect_color")
+        self.declare_parameter("image_topic", "/zed/zed_node/rgb/color/rect/image")
         self.declare_parameter("detections_topic", "/vision/detections_2d")
         self.declare_parameter("conf_thres", 0.25)
         self.declare_parameter("queue_size", 5)
@@ -123,8 +123,8 @@ class YoloLiveLoggerNode(Node):
         w = max(0.0, x2 - x1)
         h = max(0.0, y2 - y1)
 
-        bbox.center.x = cx
-        bbox.center.y = cy
+        bbox.center.position.x = cx
+        bbox.center.position.y = cy
         bbox.center.theta = 0.0
         bbox.size_x = w
         bbox.size_y = h
