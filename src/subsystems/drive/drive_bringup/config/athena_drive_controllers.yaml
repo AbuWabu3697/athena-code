@@ -48,6 +48,10 @@ controller_manager:
     # Killswitch GPIO Controller
     killswitch_gpio_controller:
       type: gpio_controllers/GpioCommandController
+
+    motor_status_broadcaster:
+      type: general_controllers/MotorStatusBroadcaster
+    
     rear_ackermann_controller:
       type: athena_drive_controllers/RearAckermannController
 
@@ -141,6 +145,17 @@ killswitch_gpio_controller:
           - kill_jetson_sent
           - is_connected
 
+motor_status_broadcaster:
+  ros__parameters:
+    joints:
+      - propulsion_fl_joint
+      - propulsion_fr_joint
+      - propulsion_bl_joint
+      - propulsion_br_joint
+    interfaces:
+      - motor_temperature
+      - torque_current
+    publish_rate: 10.0
 
 
 rear_ackermann_controller:

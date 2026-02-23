@@ -210,6 +210,12 @@ def generate_launch_description():
         arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
     )
 
+    motor_status_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["motor_status_broadcaster", "-c", "/controller_manager"],
+    )
+
     joint_state_publisher_gui_node = Node( 
         package='joint_state_publisher_gui',
         executable='joint_state_publisher_gui',
@@ -297,6 +303,14 @@ def generate_launch_description():
                     actions=[joint_state_broadcaster_spawner],
                 ),
             ],
+        )
+    )
+
+    # Delay motor_status_broadcaster after joint_state_broadcaster
+    delay_motor_status_broadcaster_after_joint_state_broadcaster = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[motor_status_broadcaster_spawner],
         )
     )
 
@@ -388,6 +402,7 @@ def generate_launch_description():
             # joint_state_publisher,
             # delay_can_node_after_control_node,
             delay_joint_state_broadcaster_spawner_after_ros2_control_node,
+            delay_motor_status_broadcaster_after_joint_state_broadcaster,
             delay_rviz_after_joint_state_broadcaster_spawner,
             controller_switcher_node,
         ]
