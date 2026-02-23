@@ -208,4 +208,4 @@ cython_debug/
 *.app
 
 .DS_Store
-*.mcap
+*.mcapsrc/subsystems/navigation/yolo_ros/*.run
