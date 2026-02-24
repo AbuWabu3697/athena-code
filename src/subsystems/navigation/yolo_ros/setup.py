@@ -12,7 +12,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/models', ['models/best.pt']),
     ],
-    install_requires=['setuptools', 'yolo', 'ultralytics'],
+    install_requires=['setuptools', 'ultralytics'],
     zip_safe=True,
     maintainer='umdloop',
     maintainer_email='umdloop@todo.todo',
