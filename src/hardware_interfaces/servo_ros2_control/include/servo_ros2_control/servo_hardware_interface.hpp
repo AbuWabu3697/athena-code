@@ -90,7 +90,6 @@ private:
   double elapsed_logger_time; // Time since last logger update
   int logger_rate; // Logger update rate
   int logger_state; // Logger on/off state
-  int write_count;
 
   // Keeps track of amount of joints
   int num_joints;
@@ -102,19 +101,11 @@ private:
   // Store the state for the simulated robot
   std::vector<double> joint_state_position_;
   std::vector<double> joint_state_velocity_;
-
-  // Store previous state for simulated robot
-  std::vector<double> prev_joint_state_position_;
-  std::vector<double> prev_joint_state_velocity_;
   
   // Store the command for the simulated robot
   std::vector<double> joint_command_position_;
   std::vector<double> joint_command_velocity_;
   
-  // Store the command for the simulated robot
-  std::vector<double> prev_joint_command_position_;
-  std::vector<double> prev_joint_command_velocity_;
-
   // Place holders for data from the canBus, will be accessed in read()
   std::vector<double> motor_velocity;
   std::vector<double> motor_position;
