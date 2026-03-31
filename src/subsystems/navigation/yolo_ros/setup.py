@@ -10,8 +10,9 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/models', ['models/best.pt']),
     ],
-    install_requires=['setuptools', 'yolo', 'ultralytics'],
+    install_requires=['setuptools', 'ultralytics'],
     zip_safe=True,
     maintainer='umdloop',
     maintainer_email='umdloop@todo.todo',
@@ -23,6 +24,7 @@ setup(
             'my_node = yolo_ros.my_node:main',
             'yolo_ros = yolo_ros.image_publisher:main',
             'inference = yolo_ros.img_inference:main',
+            'yolo_live_logger = yolo_ros.yolo_live_logger:main',
         ],
     },
 )
