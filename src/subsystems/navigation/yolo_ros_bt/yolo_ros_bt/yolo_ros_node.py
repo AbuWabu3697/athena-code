@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 
 from typing import Optional, List
+import os
 
+import cv2
 from cv_bridge import CvBridge
+
 import rclpy
 from rclpy.node import Node
 
+from ament_index_python.packages import get_package_share_directory
+
 from sensor_msgs.msg import Image
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String, Header
+from geometry_msgs.msg import PointStamped
+from vision_msgs.msg import (
+    Detection2D,
+    Detection2DArray,
+    BoundingBox2D,
+    ObjectHypothesisWithPose,
+)
+from geometry_msgs.msg import PoseWithCovariance
 
 try:
     from ultralytics import YOLO
@@ -19,11 +32,22 @@ class YoloRosNode(Node):
     def __init__(self) -> None:
         super().__init__('yolo_node')
 
+        pkg_share = get_package_share_directory("yolo_ros")
+        default_model_path = os.path.join(pkg_share, "models", "best9.pt")
+
         self.declare_parameter('use_sim_time', False)
         self.declare_parameter('conf_thres', 0.5)
-        self.declare_parameter('model_path', 'yolov8n.pt')
+        self.declare_parameter('model_path', default_model_path)
         self.declare_parameter('image_topic', '/camera/image_raw')
-        self.declare_parameter('target_class', 'bottle')
+        self.declare_parameter('target_classes', ['Bottle', 'Mallet', 'Rock-Pick-Hammer'])
+        self.declare_parameter('publish_annotated_image', True)
+        self.declare_parameter('annotated_image_topic', '/yolo/annotated_image')
+
+        # extra outputs from yolo_live_logger.py
+        self.declare_parameter('legacy_detections_topic', '/vision/detections_2d')
+        self.declare_parameter('queue_size', 5)
+        self.declare_parameter('default_frame_id', '')
+        self.declare_parameter('include_source_img', False)
 
         self.conf_thres: float = float(
             self.get_parameter('conf_thres').get_parameter_value().double_value
@@ -34,8 +58,32 @@ class YoloRosNode(Node):
         self.image_topic: str = (
             self.get_parameter('image_topic').get_parameter_value().string_value
         )
-        self.target_class: str = (
-            self.get_parameter('target_class').get_parameter_value().string_value
+        self.target_classes = self.get_parameter('target_classes').value
+
+        self.publish_annotated_image: bool = (
+            self.get_parameter('publish_annotated_image')
+            .get_parameter_value()
+            .bool_value
+        )
+        self.annotated_image_topic: str = (
+            self.get_parameter('annotated_image_topic')
+            .get_parameter_value()
+            .string_value
+        )
+
+        self.legacy_detections_topic: str = (
+            self.get_parameter('legacy_detections_topic')
+            .get_parameter_value()
+            .string_value
+        )
+        self.queue_size: int = int(
+            self.get_parameter('queue_size').get_parameter_value().integer_value
+        )
+        self.default_frame_id: str = (
+            self.get_parameter('default_frame_id').get_parameter_value().string_value
+        )
+        self.include_source_img: bool = (
+            self.get_parameter('include_source_img').get_parameter_value().bool_value
         )
 
         self.bridge = CvBridge()
@@ -49,6 +97,7 @@ class YoloRosNode(Node):
         try:
             self.model = YOLO(self.model_path)
             self.get_logger().info(f'Loaded YOLO model from: {self.model_path}')
+            self.get_logger().info(f'YOLO classes: {self.model.names}')
         except Exception as exc:
             self.get_logger().error(f'Failed to load YOLO model: {exc}')
             raise
@@ -57,62 +106,278 @@ class YoloRosNode(Node):
             Image,
             self.image_topic,
             self.image_callback,
-            10
+            self.queue_size
+        )
+
+        # main detections topic
+        self.detections_pub = self.create_publisher(
+            Detection2DArray,
+            '/yolo/detections',
+            self.queue_size
+        )
+
+        # legacy/live-logger detections topic
+        self.legacy_detections_pub = self.create_publisher(
+            Detection2DArray,
+            self.legacy_detections_topic,
+            self.queue_size
         )
 
         self.target_found_pub = self.create_publisher(
             Bool,
             '/yolo/target_found',
-            10
+            self.queue_size
         )
 
-        self.get_logger().info('YOLO ROS node initialized')
+        self.target_label_pub = self.create_publisher(
+            String,
+            '/yolo/target_label',
+            self.queue_size
+        )
+
+        self.target_center_pub = self.create_publisher(
+            PointStamped,
+            '/yolo/target_center',
+            self.queue_size
+        )
+
+        self.annotated_image_pub = self.create_publisher(
+            Image,
+            self.annotated_image_topic,
+            self.queue_size
+        )
+
+        self.get_logger().info('Merged YOLO ROS node initialized')
         self.get_logger().info(f'Subscribing to image topic: {self.image_topic}')
-        self.get_logger().info(f'Target class: {self.target_class}')
+        self.get_logger().info(f'Target class: {self.target_classes}')
         self.get_logger().info(f'Confidence threshold: {self.conf_thres:.2f}')
+        self.get_logger().info(
+            f'Publishing detections to /yolo/detections and {self.legacy_detections_topic}'
+        )
 
     def image_callback(self, msg: Image) -> None:
         try:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except Exception as exc:
             self.get_logger().error(f'Failed to convert image: {exc}')
-            self.publish_target_found(False)
             return
 
         try:
-            results = self.model(frame, verbose=False)
+            results = self.model(frame, verbose=False, conf=self.conf_thres)
         except Exception as exc:
             self.get_logger().error(f'YOLO inference failed: {exc}')
-            self.publish_target_found(False)
             return
 
+        main_detection_array = Detection2DArray()
+        main_detection_array.header = msg.header
+
+        legacy_detection_array = Detection2DArray()
+        legacy_detection_array.header = self._make_header(msg)
+
         target_found = False
+        best_target_conf = -1.0
+        best_target_center = None
+        best_target_label = ''
 
-        if results:
-            result = results[0]
-            boxes = getattr(result, 'boxes', None)
-            names = getattr(result, 'names', {})
+        annotated_frame = frame.copy()
 
-            if boxes is not None and len(boxes) > 0:
-                for box in boxes:
-                    conf = float(box.conf[0].item())
-                    class_id = int(box.cls[0].item())
+        if not results:
+            self.publish_empty_outputs(msg.header)
+            self.legacy_detections_pub.publish(legacy_detection_array)
+            return
 
-                    if conf < self.conf_thres:
-                        continue
+        result = results[0]
+        boxes = getattr(result, 'boxes', None)
+        names = getattr(result, 'names', {})
 
-                    class_name = names[class_id] if class_id in names else str(class_id)
+        if boxes is None or len(boxes) == 0:
+            self.detections_pub.publish(main_detection_array)
+            self.legacy_detections_pub.publish(legacy_detection_array)
+            self.publish_target_outputs(
+                msg.header,
+                found=False,
+                target_center=None,
+                target_label=''
+            )
+            if self.publish_annotated_image:
+                self.publish_annotated(annotated_frame, msg.header)
+            return
 
-                    if class_name == self.target_class:
-                        target_found = True
-                        break
+        for box in boxes:
+            conf = float(box.conf[0].item())
+            class_id = int(box.cls[0].item())
 
-        self.publish_target_found(target_found)
+            if conf < self.conf_thres:
+                continue
 
-    def publish_target_found(self, found: bool) -> None:
-        msg = Bool()
-        msg.data = found
-        self.target_found_pub.publish(msg)
+            class_name = names[class_id] if class_id in names else str(class_id)
+
+            x_min, y_min, x_max, y_max = box.xyxy[0].tolist()
+            center_x = (x_min + x_max) / 2.0
+            center_y = (y_min + y_max) / 2.0
+            width = x_max - x_min
+            height = y_max - y_min
+
+            # /yolo/detections message
+            detection_msg = Detection2D()
+            detection_msg.header = msg.header
+            detection_msg.bbox.center.position.x = center_x
+            detection_msg.bbox.center.position.y = center_y
+            detection_msg.bbox.size_x = width
+            detection_msg.bbox.size_y = height
+
+            hypothesis = ObjectHypothesisWithPose()
+            hypothesis.hypothesis.class_id = class_name
+            hypothesis.hypothesis.score = conf
+            detection_msg.results.append(hypothesis)
+
+            main_detection_array.detections.append(detection_msg)
+
+            # /vision/detections_2d-compatible message
+            legacy_msg = self._make_detection2d_legacy(
+                header=legacy_detection_array.header,
+                class_name=class_name,
+                conf=conf,
+                x1=float(x_min),
+                y1=float(y_min),
+                x2=float(x_max),
+                y2=float(y_max),
+                source_img=(msg if self.include_source_img else None),
+            )
+            legacy_detection_array.detections.append(legacy_msg)
+
+            if class_name in self.target_classes and conf > best_target_conf:
+                target_found = True
+                best_target_conf = conf
+                best_target_center = (center_x, center_y)
+                best_target_label = class_name
+
+            cv2.rectangle(
+                annotated_frame,
+                (int(x_min), int(y_min)),
+                (int(x_max), int(y_max)),
+                (0, 255, 0),
+                2
+            )
+            cv2.putText(
+                annotated_frame,
+                f'{class_name} {conf:.2f}',
+                (int(x_min), max(0, int(y_min) - 10)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                2
+            )
+
+        self.detections_pub.publish(main_detection_array)
+        self.legacy_detections_pub.publish(legacy_detection_array)
+
+        self.publish_target_outputs(
+            msg.header,
+            found=target_found,
+            target_center=best_target_center,
+            target_label=best_target_label if target_found else ''
+        )
+
+        if self.publish_annotated_image:
+            self.publish_annotated(annotated_frame, msg.header)
+
+    def _make_header(self, msg: Image) -> Header:
+        header = Header()
+        header.stamp = msg.header.stamp
+        if msg.header.frame_id:
+            header.frame_id = msg.header.frame_id
+        elif self.default_frame_id:
+            header.frame_id = self.default_frame_id
+        else:
+            header.frame_id = ''
+        return header
+
+    def _make_detection2d_legacy(
+        self,
+        header: Header,
+        class_name: str,
+        conf: float,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        source_img: Optional[Image],
+    ) -> Detection2D:
+        det = Detection2D()
+        det.header = header
+        det.id = ""
+
+        bbox = BoundingBox2D()
+        cx = (x1 + x2) / 2.0
+        cy = (y1 + y2) / 2.0
+        w = max(0.0, x2 - x1)
+        h = max(0.0, y2 - y1)
+
+        bbox.center.position.x = cx
+        bbox.center.position.y = cy
+        bbox.center.theta = 0.0
+        bbox.size_x = w
+        bbox.size_y = h
+        det.bbox = bbox
+
+        hyp = ObjectHypothesisWithPose()
+        hyp.hypothesis.class_id = str(class_name)
+        hyp.hypothesis.score = float(conf)
+        hyp.pose = PoseWithCovariance()
+        det.results.append(hyp)
+
+        if source_img is not None:
+            det.source_img = source_img
+
+        return det
+
+    def publish_empty_outputs(self, header) -> None:
+        empty_array = Detection2DArray()
+        empty_array.header = header
+        self.detections_pub.publish(empty_array)
+
+        empty_legacy = Detection2DArray()
+        empty_legacy.header = header
+        self.legacy_detections_pub.publish(empty_legacy)
+
+        self.publish_target_outputs(
+            header,
+            found=False,
+            target_center=None,
+            target_label=''
+        )
+
+    def publish_target_outputs(
+        self,
+        header,
+        found: bool,
+        target_center: Optional[tuple],
+        target_label: str
+    ) -> None:
+        found_msg = Bool()
+        found_msg.data = found
+        self.target_found_pub.publish(found_msg)
+
+        label_msg = String()
+        label_msg.data = target_label
+        self.target_label_pub.publish(label_msg)
+
+        if found and target_center is not None:
+            point_msg = PointStamped()
+            point_msg.header = header
+            point_msg.point.x = float(target_center[0])
+            point_msg.point.y = float(target_center[1])
+            point_msg.point.z = 0.0
+            self.target_center_pub.publish(point_msg)
+
+    def publish_annotated(self, frame, header) -> None:
+        try:
+            img_msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
+            img_msg.header = header
+            self.annotated_image_pub.publish(img_msg)
+        except Exception as exc:
+            self.get_logger().warn(f'Failed to publish annotated image: {exc}')
 
 
 def main(args: Optional[List[str]] = None) -> None:
