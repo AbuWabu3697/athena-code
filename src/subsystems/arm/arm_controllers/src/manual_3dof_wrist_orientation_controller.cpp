@@ -1,4 +1,4 @@
-#include "athena_arm_controllers/manual_arm_joint_by_joint_controller.hpp"
+#include "athena_arm_controllers/manual_3dof_wrist_orientation_controller.hpp"
 
 #include <limits>
 #include <memory>
@@ -23,7 +23,7 @@ static constexpr rmw_qos_profile_t rmw_qos_profile_services_hist_keep_all = {
   RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,
   false};
 
-using ControllerReferenceMsg = arm_controllers::ManualArmJointByJointController::ControllerReferenceMsg;
+using ControllerReferenceMsg = arm_controllers::Manual3DOFWristOrientationController::ControllerReferenceMsg;
 
 // called from RT control loop
 void reset_controller_reference_msg(
@@ -37,15 +37,15 @@ void reset_controller_reference_msg(
 
 namespace arm_controllers
 {
-ManualArmJointByJointController::ManualArmJointByJointController() : controller_interface::ControllerInterface() {}
+Manual3DOFWristOrientationController::Manual3DOFWristOrientationController() : controller_interface::ControllerInterface() {}
 
-controller_interface::CallbackReturn ManualArmJointByJointController::on_init()
+controller_interface::CallbackReturn Manual3DOFWristOrientationController::on_init()
 {
   control_mode_.initRT(control_mode_type::FAST);
 
   try
   {
-    param_listener_ = std::make_shared<manual_arm_joint_by_joint_controller::ParamListener>(get_node());
+    param_listener_ = std::make_shared<manual_3dof_wrist_joint_by_joint_controller::ParamListener>(get_node());
   }
   catch (const std::exception & e)
   {
@@ -56,7 +56,7 @@ controller_interface::CallbackReturn ManualArmJointByJointController::on_init()
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::CallbackReturn ManualArmJointByJointController::on_configure(
+controller_interface::CallbackReturn Manual3DOFWristOrientationController::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   params_ = param_listener_->get_params();
@@ -64,19 +64,16 @@ controller_interface::CallbackReturn ManualArmJointByJointController::on_configu
   num_joints = static_cast<int>(params_.joints.size());
   joint_velocities_.resize(num_joints, 0.0); // Output
   max_velocities_ = params_.joint_max_velocities;
-  virtual_four_bar_coupling_ratio_ = params_.virtual_four_bar_coupling_ratio;
 
   // topics QoS
   auto subscribers_qos = rclcpp::SystemDefaultsQoS();
-  subscribers_qos.keep_last(1);  // Virtual four-bar compensation. With the current -1.0 ratio, shoulder-only motion commands
-  // the elbow motor equally in the opposite direction so the net elbow joint angle stays fixed.
-  joint_velocities_[2] += virtual_four_bar_coupling_ratio_ * joint_velocities_[1];
+  subscribers_qos.keep_last(1);
   subscribers_qos.best_effort();
 
   // Reference Subscriber
   ref_subscriber_ = get_node()->create_subscription<ControllerReferenceMsg>(
     "controller_input", subscribers_qos,
-    std::bind(&ManualArmJointByJointController::reference_callback, this, std::placeholders::_1));
+    std::bind(&Manual3DOFWristOrientationController::reference_callback, this, std::placeholders::_1));
   
   // Create, populate with NaN, and write message to input_ref_ to be used in reference callback
   std::shared_ptr<ControllerReferenceMsg> msg = std::make_shared<ControllerReferenceMsg>();
@@ -127,12 +124,12 @@ controller_interface::CallbackReturn ManualArmJointByJointController::on_configu
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-void ManualArmJointByJointController::reference_callback(const std::shared_ptr<ControllerReferenceMsg> msg)
+void Manual3DOFWristOrientationController::reference_callback(const std::shared_ptr<ControllerReferenceMsg> msg)
 {
   input_ref_.writeFromNonRT(msg);
 }
 
-controller_interface::InterfaceConfiguration ManualArmJointByJointController::command_interface_configuration() const
+controller_interface::InterfaceConfiguration Manual3DOFWristOrientationController::command_interface_configuration() const
 {
   controller_interface::InterfaceConfiguration command_interfaces_config;
   command_interfaces_config.type = controller_interface::interface_configuration_type::INDIVIDUAL;
@@ -147,7 +144,7 @@ controller_interface::InterfaceConfiguration ManualArmJointByJointController::co
   return command_interfaces_config;
 }
 
-controller_interface::InterfaceConfiguration ManualArmJointByJointController::state_interface_configuration() const
+controller_interface::InterfaceConfiguration Manual3DOFWristOrientationController::state_interface_configuration() const
 {
   controller_interface::InterfaceConfiguration state_interfaces_config;
   state_interfaces_config.type = controller_interface::interface_configuration_type::INDIVIDUAL;
@@ -160,7 +157,7 @@ controller_interface::InterfaceConfiguration ManualArmJointByJointController::st
   return state_interfaces_config;
 }
 
-controller_interface::CallbackReturn ManualArmJointByJointController::on_activate(
+controller_interface::CallbackReturn Manual3DOFWristOrientationController::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   // Set default value in command
@@ -169,7 +166,7 @@ controller_interface::CallbackReturn ManualArmJointByJointController::on_activat
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::CallbackReturn ManualArmJointByJointController::on_deactivate(
+controller_interface::CallbackReturn Manual3DOFWristOrientationController::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   for (size_t i = 0; i < command_interfaces_.size(); ++i)
@@ -179,30 +176,26 @@ controller_interface::CallbackReturn ManualArmJointByJointController::on_deactiv
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::return_type ManualArmJointByJointController::update(
+controller_interface::return_type Manual3DOFWristOrientationController::update(
   const rclcpp::Time & time, const rclcpp::Duration & /*period*/)
 {
   auto current_ref = input_ref_.readFromRT();
 
   if (!std::isnan((*current_ref)->axes[0]))
   {
-    // Base Yaw: L/R Left Stick
-    joint_velocities_[0] = ((*current_ref)->buttons[1] == 1) ? 0.0 : (*current_ref)->axes[0] * max_velocities_[0];
-
-    // Shoulder Pitch: U/D Left Stick
-    joint_velocities_[1] = ((*current_ref)->buttons[1] == 1) ? 0.0 : -(*current_ref)->axes[1] * max_velocities_[1];
+    // Motor A: U/D on Left Joystick AND O button 
+    joint_velocities_[0] = -(*current_ref)->axes[1] * static_cast<float>((*current_ref)->buttons[1]) * max_velocities_[0];
     
-    // Elbow Pitch: U/D Right Stick
-    joint_velocities_[2] = (*current_ref)->axes[3] * max_velocities_[2];
+    // Motor B: L/R on Left Joystick AND O button
+    joint_velocities_[1] = -(*current_ref)->axes[0] * static_cast<float>((*current_ref)->buttons[1]) * max_velocities_[1];
+
+    // Motor C: U/D on Right Joystick AND O button
+    joint_velocities_[2] = -(*current_ref)->axes[3] * static_cast<float>((*current_ref)->buttons[1]) * max_velocities_[2];
   }
   else{
     // RCLCPP_INFO(get_node()->get_logger(), "Returning NaN");
     joint_velocities_.resize(num_joints, 0.0);
   }
-
-  // Virtual four-bar compensation. With the current -1.0 ratio, shoulder-only motion commands
-  // the elbow motor equally in the opposite direction so the net elbow joint angle stays fixed.
-  joint_velocities_[2] += virtual_four_bar_coupling_ratio_ * joint_velocities_[1];
 
   // RCLCPP_INFO(get_node()->get_logger(), "Size of Command Interface: %d", command_interfaces_.size());
 
@@ -234,4 +227,4 @@ controller_interface::return_type ManualArmJointByJointController::update(
 #include "pluginlib/class_list_macros.hpp"
 
 PLUGINLIB_EXPORT_CLASS(
-  arm_controllers::ManualArmJointByJointController, controller_interface::ControllerInterface)
+  arm_controllers::Manual3DOFWristOrientationController, controller_interface::ControllerInterface)

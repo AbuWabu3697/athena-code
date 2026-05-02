@@ -17,8 +17,18 @@
 # [RosTeamWorkspace](https://github.com/StoglRobotics/ros_team_workspace) repository.
 #
 
-manual_arm_joint_by_joint_controller:
-  joints: {
+manual_end_effector_gripper_claw_controller:
+  position_joints: {
+    type: string_array,
+    default_value: [],
+    description: "Specifies joints which are controlled via position.",
+    read_only: true,
+    validation: {
+      unique<>: null,
+      not_empty<>: null,
+    }
+  }
+  velocity_joints: {
     type: string_array,
     default_value: [],
     description: "Specifies joints which are controlled via velocity.",
@@ -55,13 +65,15 @@ manual_arm_joint_by_joint_controller:
     read_only: true,
     validation: {
       not_empty<>: null,
-      fixed_size<>: 3,
     }
   }
 
-  virtual_four_bar_coupling_ratio: {
-    type: double,
-    default_value: -1.0,
-    description: "Virtual four-bar ratio applied as elbow_motor_velocity += ratio * shoulder_motor_velocity.",
+  joint_max_positions: {
+    type: double_array,
+    default_value: [],
+    description: "Specifies maximum joint positions in rad or m. These should be obtained via experimentation.",
     read_only: true,
+    validation: {
+      not_empty<>: null,
+    }
   }

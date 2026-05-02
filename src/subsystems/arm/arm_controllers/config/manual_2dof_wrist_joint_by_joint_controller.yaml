@@ -17,7 +17,7 @@
 # [RosTeamWorkspace](https://github.com/StoglRobotics/ros_team_workspace) repository.
 #
 
-manual_arm_joint_by_joint_controller:
+manual_2dof_wrist_joint_by_joint_controller:
   joints: {
     type: string_array,
     default_value: [],
@@ -55,13 +55,6 @@ manual_arm_joint_by_joint_controller:
     read_only: true,
     validation: {
       not_empty<>: null,
-      fixed_size<>: 3,
+      fixed_size<>: 2,
     }
-  }
-
-  virtual_four_bar_coupling_ratio: {
-    type: double,
-    default_value: -1.0,
-    description: "Virtual four-bar ratio applied as elbow_motor_velocity += ratio * shoulder_motor_velocity.",
-    read_only: true,
   }

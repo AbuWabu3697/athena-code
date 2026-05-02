@@ -1,12 +1,12 @@
-#ifndef ATHENA_ARM_CONTROLLERS__MANUAL_ARM_JOINT_BY_JOINT_CONTROLLER_HPP_
-#define ATHENA_ARM_CONTROLLERS__MANUAL_ARM_JOINT_BY_JOINT_CONTROLLER_HPP_
+#ifndef ATHENA_ARM_CONTROLLERS__MANUAL_3DOF_WRIST_JOINT_BY_JOINT_CONTROLLER_HPP_
+#define ATHENA_ARM_CONTROLLERS__MANUAL_3DOF_WRIST_JOINT_BY_JOINT_CONTROLLER_HPP_
 
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "controller_interface/controller_interface.hpp"
-#include <arm_controllers/manual_arm_joint_by_joint_controller_parameters.hpp>
+#include <arm_controllers/manual_3dof_wrist_joint_by_joint_controller_parameters.hpp>
 #include "athena_arm_controllers/visibility_control.h"
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
@@ -18,6 +18,7 @@
 #include "control_msgs/msg/joint_controller_state.hpp"
 #include "control_msgs/msg/joint_jog.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+
 
 namespace arm_controllers
 {
@@ -40,11 +41,11 @@ enum class control_mode_type : std::uint8_t
   SLOW = 1,
 };
 
-class ManualArmJointByJointController : public controller_interface::ControllerInterface
+class Manual3DOFWristJointByJointController : public controller_interface::ControllerInterface
 {
 public:
   ATHENA_ARM_CONTROLLERS__VISIBILITY_PUBLIC
-  ManualArmJointByJointController();
+  Manual3DOFWristJointByJointController();
 
   ATHENA_ARM_CONTROLLERS__VISIBILITY_PUBLIC
   controller_interface::CallbackReturn on_init() override;
@@ -77,8 +78,8 @@ public:
   using ControllerStateMsg = control_msgs::msg::JointControllerState;
 
 protected:
-  std::shared_ptr<manual_arm_joint_by_joint_controller::ParamListener> param_listener_;
-  manual_arm_joint_by_joint_controller::Params params_;
+  std::shared_ptr<manual_3dof_wrist_joint_by_joint_controller::ParamListener> param_listener_;
+  manual_3dof_wrist_joint_by_joint_controller::Params params_;
 
   int num_joints;
 
@@ -87,9 +88,6 @@ protected:
 
   // Represents maximum velocities of each joint
   std::vector<double> max_velocities_;
-
-  // Virtual four-bar ratio applied as elbow_motor_velocity += ratio * shoulder_motor_velocity.
-  double virtual_four_bar_coupling_ratio_ = -1.0;
 
   // Command subscribers and Controller State publisher
   rclcpp::Subscription<ControllerReferenceMsg>::SharedPtr ref_subscriber_ = nullptr;
@@ -111,4 +109,4 @@ private:
 
 }  // namespace arm_controllers
 
-#endif  // ATHENA_ARM_CONTROLLERS__MANUAL_ARM_JOINT_BY_JOINT_CONTROLLER_HPP_
+#endif  // ATHENA_ARM_CONTROLLERS__MANUAL_3DOF_WRIST_JOINT_BY_JOINT_CONTROLLER_HPP_

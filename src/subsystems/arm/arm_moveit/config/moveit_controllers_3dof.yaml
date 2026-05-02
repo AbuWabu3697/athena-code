@@ -9,9 +9,9 @@ moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControll
 
 moveit_simple_controller_manager:
   controller_names:
-    - twodof_joint_trajectory_controller
+    - threedof_joint_trajectory_controller
 
-  twodof_joint_trajectory_controller:
+  threedof_joint_trajectory_controller:
     type: FollowJointTrajectory
     action_ns: follow_joint_trajectory
     default: true
@@ -19,7 +19,8 @@ moveit_simple_controller_manager:
       - base_yaw
       - shoulder_pitch
       - elbow_pitch
-      - wrist_pitch
-      - wrist_roll
+      - wrist_motor_a
+      - wrist_motor_b
+      - wrist_motor_c
       - gripper_claw
       - actuator
